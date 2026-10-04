@@ -1,0 +1,19 @@
+services:
+  postgres-test:
+    image: postgres:17-alpine
+    # Disposable local integration-test database; bind only to loopback.
+    environment:
+      POSTGRES_DB: reservations_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      # The official entrypoint runs this baseline once on an empty data directory.
+      - ./sql/001_initial.sql:/docker-entrypoint-initdb.d/001_initial.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d reservations_test"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
