@@ -47,7 +47,7 @@ Start the disposable PostgreSQL database. On its first start, Compose applies th
 docker compose -f stage-1/compose.test.yml up -d --wait
 ```
 
-For the host-run path, `DATABASE_URL` must either be unset or point to the Stage 1 `reservations_test` database. Copy `stage-4/.env.example` to `stage-4/.env` if needed and set its `BOOTSTRAP_ADMIN_TOKEN`; if that file contains `DATABASE_URL`, use `postgresql://postgres:postgres@127.0.0.1:5432/reservations_test`. Then launch the app from the repository root:
+For host-run development against the Stage 1 test service, leave `DATABASE_URL` unset (the app defaults to `reservations_test`) or set it to `postgresql://postgres:postgres@127.0.0.1:5432/reservations_test`. Copy `stage-4/.env.example` to `stage-4/.env` if needed and set its `BOOTSTRAP_ADMIN_TOKEN`. If that file defines `DATABASE_URL`, use the test URL above for this test-service path. For a different PostgreSQL database, set that database's own URL as described below. Then launch the app from the repository root:
 
 ```powershell
 Remove-Item Env:DATABASE_URL -ErrorAction SilentlyContinue
@@ -56,13 +56,13 @@ python -m uvicorn app.main:app --app-dir stage-2 --env-file stage-4/.env --reloa
 
 In macOS or Linux, use `unset DATABASE_URL` and `python -m uvicorn app.main:app --app-dir stage-2 --env-file stage-4/.env --reload`. Uvicorn's `--env-file` loads `BOOTSTRAP_ADMIN_TOKEN` for the host process; `uvicorn[standard]` supplies its dotenv support. Open <http://127.0.0.1:8000> for the dashboard; `/health` is the API health endpoint. The UI and API use the same origin.
 
-For an existing PostgreSQL database, create an empty database and apply the schema once:
+For an existing PostgreSQL database, create an empty database and apply the schema once using its connection URL:
 
 ```sh
 psql "$DATABASE_URL" -f stage-1/sql/001_initial.sql
 ```
 
-For host execution, leave `DATABASE_URL` unset or set it to the Stage 1 test URL when using the Stage 1 test service; set `BOOTSTRAP_ADMIN_TOKEN` directly or load it from `stage-4/.env` as above. The bootstrap token has administrator access and is checked in constant time. Keep it out of source control. All API routes except `/health` require `Authorization: Bearer <key>`.
+For host execution against that existing database, set `DATABASE_URL` to its connection string before launching the API. Only when using the Stage 1 test service should `DATABASE_URL` be unset or set to the test URL above. Set `BOOTSTRAP_ADMIN_TOKEN` directly or load it from `stage-4/.env` as above. The bootstrap token has administrator access and is checked in constant time. Keep it out of source control. All API routes except `/health` require `Authorization: Bearer <key>`.
 
 Stop the disposable database when finished:
 
