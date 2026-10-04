@@ -1,4 +1,4 @@
-"""Stage 1 restaurant reservation API."""
+"""Tablekeeper FastAPI reservation API."""
 
 from __future__ import annotations
 
