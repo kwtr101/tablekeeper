@@ -46,6 +46,9 @@
     if (response.status === 204) return null;
     const contentType = response.headers.get('content-type') || '';
     const payload = contentType.includes('application/json') ? await response.json() : null;
+    if (response.status === 401) {
+      throw new Error('Authentication failed. Enter this Tablekeeper instance\'s BOOTSTRAP_ADMIN_TOKEN or a Tablekeeper API key.');
+    }
     if (!response.ok) throw new Error(errorMessage(payload, `Request failed (${response.status})`));
     return payload;
   }

@@ -47,15 +47,14 @@ Start the disposable PostgreSQL database. On its first start, Compose applies th
 docker compose -f stage-1/compose.test.yml up -d --wait
 ```
 
-Set the connection string and an administrator bootstrap token, then launch the app from the repository root:
+For the host-run path, `DATABASE_URL` must either be unset or point to the Stage 1 `reservations_test` database. Copy `stage-4/.env.example` to `stage-4/.env` if needed and set its `BOOTSTRAP_ADMIN_TOKEN`; if that file contains `DATABASE_URL`, use `postgresql://postgres:postgres@127.0.0.1:5432/reservations_test`. Then launch the app from the repository root:
 
 ```powershell
-$env:DATABASE_URL = 'postgresql://postgres:postgres@127.0.0.1:5432/reservations_test'
-$env:BOOTSTRAP_ADMIN_TOKEN = 'replace-with-a-long-random-secret'
-python -m uvicorn app.main:app --app-dir stage-2 --reload
+Remove-Item Env:DATABASE_URL -ErrorAction SilentlyContinue
+python -m uvicorn app.main:app --app-dir stage-2 --env-file stage-4/.env --reload
 ```
 
-In macOS or Linux shells, set the same variables with `export DATABASE_URL=...` and `export BOOTSTRAP_ADMIN_TOKEN=...`. Open <http://127.0.0.1:8000> for the dashboard; `/health` is the API health endpoint. The UI and API use the same origin.
+In macOS or Linux, use `unset DATABASE_URL` and `python -m uvicorn app.main:app --app-dir stage-2 --env-file stage-4/.env --reload`. Uvicorn's `--env-file` loads `BOOTSTRAP_ADMIN_TOKEN` for the host process; `uvicorn[standard]` supplies its dotenv support. Open <http://127.0.0.1:8000> for the dashboard; `/health` is the API health endpoint. The UI and API use the same origin.
 
 For an existing PostgreSQL database, create an empty database and apply the schema once:
 
@@ -63,7 +62,7 @@ For an existing PostgreSQL database, create an empty database and apply the sche
 psql "$DATABASE_URL" -f stage-1/sql/001_initial.sql
 ```
 
-Set `DATABASE_URL` and `BOOTSTRAP_ADMIN_TOKEN` in the service process environment. The bootstrap token has administrator access and is checked in constant time. Keep it out of source control. All API routes except `/health` require `Authorization: Bearer <key>`.
+For host execution, leave `DATABASE_URL` unset or set it to the Stage 1 test URL when using the Stage 1 test service; set `BOOTSTRAP_ADMIN_TOKEN` directly or load it from `stage-4/.env` as above. The bootstrap token has administrator access and is checked in constant time. Keep it out of source control. All API routes except `/health` require `Authorization: Bearer <key>`.
 
 Stop the disposable database when finished:
 
@@ -93,7 +92,7 @@ The dark responsive dashboard uses `#9230e1` as its primary accent and calls the
 | `GET` | `/reservations` | Authenticated | Customers see their own reservations; admins can list all and filter by restaurant |
 | `DELETE` | `/reservations/{reservation_id}` | Owner or admin | Cancel a confirmed reservation |
 
-All API routes except `/health` require a bearer API key. Admin routes return `403` to customer keys. Missing or invalid credentials return `401`.
+All API routes except `/health` require a Tablekeeper bearer credential. For administrator access, enter the same `BOOTSTRAP_ADMIN_TOKEN` value configured in the API process. A key issued by another workspace, provider, or unrelated service will return `401`; customer keys created by Tablekeeper work for customer routes. Admin routes return `403` to customer keys. Missing or invalid credentials return `401`.
 
 Create a customer key with the bootstrap administrator credential:
 
@@ -148,4 +147,4 @@ The suite creates and drops a unique schema for each run. It sends 32 synchroniz
 
 ## Container deployment
 
-For a self-contained local deployment with persistent PostgreSQL storage, follow [Stage 4 deployment instructions](stage-4/DEPLOYMENT.md). The stack binds the web port to loopback by default. For public hosting, configure HTTPS and secret management at the deployment boundary.
+For a self-contained local deployment with persistent PostgreSQL storage, follow [Stage 4 deployment instructions](stage-4/DEPLOYMENT.md). That Compose stack builds its internal database URL from `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB`, and reaches PostgreSQL at hostname `db`. Do not use the host-local Stage 1 test URL inside that stack. The stack binds the web port to loopback by default. For public hosting, configure HTTPS and secret management at the deployment boundary.

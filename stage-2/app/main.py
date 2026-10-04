@@ -11,19 +11,33 @@ from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import psycopg
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
-from fastapi.responses import FileResponse
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from psycopg.errors import ExclusionViolation
 from psycopg.rows import dict_row
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/reservations")
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://postgres:postgres@127.0.0.1:5432/reservations_test",
+)
 BOOTSTRAP_ADMIN_TOKEN = os.getenv("BOOTSTRAP_ADMIN_TOKEN", "")
 DEFAULT_DURATION_MINUTES = 90
 
 app = FastAPI(title="Tablekeeper Service", version="1.0.0")
 STATIC_DIR = Path(__file__).resolve().parents[2] / "stage-3" / "static"
+
+
+@app.exception_handler(psycopg.OperationalError)
+async def database_unavailable(_request: Request, _error: psycopg.OperationalError) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content={
+            "detail": "Database unavailable. Check DATABASE_URL for the selected startup mode, "
+            "verify PostgreSQL credentials, and confirm the database is ready."
+        },
+    )
 
 
 def connect() -> psycopg.Connection:
