@@ -2,13 +2,14 @@
 
 Run with TEST_DATABASE_URL pointing to a disposable PostgreSQL database where the
 user can create/drop schemas and install btree_gist:
-    python -m unittest discover -s tests -v
+    python -m unittest discover -s stage-2/tests -v
 """
 
 from __future__ import annotations
 
 import asyncio
 import os
+import sys
 import uuid
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -21,6 +22,8 @@ from psycopg.errors import ExclusionViolation
 
 
 ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = ROOT.parent
+sys.path.insert(0, str(ROOT))
 ADMIN_TOKEN = "stage1-test-bootstrap-token"
 START = datetime(2030, 1, 15, 19, 0, tzinfo=timezone.utc)
 
@@ -43,7 +46,11 @@ class ReservationConcurrencyTests(unittest.TestCase):
             base_url, options=f"-c search_path={cls.schema},public"
         )
         with psycopg.connect(cls.database_url) as conn:
-            conn.execute((ROOT / "sql" / "001_initial.sql").read_text(encoding="utf-8"))
+            conn.execute(
+                (REPO_ROOT / "stage-1" / "sql" / "001_initial.sql").read_text(
+                    encoding="utf-8"
+                )
+            )
 
         os.environ["DATABASE_URL"] = cls.database_url
         os.environ["BOOTSTRAP_ADMIN_TOKEN"] = ADMIN_TOKEN

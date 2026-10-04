@@ -1,65 +1,151 @@
-# Restaurant Reservation Service — Stage 1
+# Tablekeeper — Stage 1–4
 
-A small FastAPI service backed by PostgreSQL. Stage 1 includes administrator-managed restaurant and table setup, API-key authentication, customer reservations, reservation listing, and cancellation.
+Tablekeeper is a FastAPI restaurant-reservation service backed by PostgreSQL. It includes an administrator and customer API, a same-origin dashboard, and a Docker Compose deployment for local hosting.
 
-## Requirements and setup
+## Repository stages
 
-- Python 3.11 or newer (for `zoneinfo`)
-- PostgreSQL 14 or newer
-
-Create a database, then apply the schema once:
-
-```sh
-psql "$DATABASE_URL" -f sql/001_initial.sql
+```text
+stage-1/
+  sql/001_initial.sql       PostgreSQL schema and overlap constraint
+  compose.test.yml          Disposable PostgreSQL database for local use/tests
+stage-2/
+  app/main.py               FastAPI service
+  tests/                    PostgreSQL integration tests
+  requirements*.txt         Runtime and test dependencies
+stage-3/
+  static/                   Dashboard HTML, CSS, and JavaScript
+stage-4/
+  Dockerfile                API image
+  compose.yml               Local container deployment
+  .env.example              Deployment configuration template
+  DEPLOYMENT.md             Container deployment steps
 ```
 
-Install and start the service:
+This split keeps each delivery stage distinct. `README.md` stays at the repository root as the entry point for setup, API usage, testing, and deployment.
 
-```sh
-python -m venv .venv
-. .venv/bin/activate                 # Windows PowerShell: .venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-export DATABASE_URL='postgresql://postgres:postgres@localhost:5432/reservations'
-export BOOTSTRAP_ADMIN_TOKEN='replace-with-a-long-random-secret'
-uvicorn app.main:app --reload
-```
+## Requirements
 
-Set `DATABASE_URL` and `BOOTSTRAP_ADMIN_TOKEN` in the process environment before launch. The bootstrap token grants administrator access and is compared in constant time; keep it out of source control. All API routes except `/health` require `Authorization: Bearer <key>`. The bootstrap token is an administrator key. Use it to create customer keys; the returned plaintext key is shown once, while only its SHA-256 hash is stored.
+- Python 3.11 or newer
+- Docker Engine and the Docker Compose plugin for the disposable database or full container stack
+- PostgreSQL 14 or newer when using an external database
 
-## API defaults
+## Run locally
 
-- `GET /health` reports process health.
-- `POST /admin/api-keys` creates a customer API key. Body: `{ "role": "customer" }`.
-- `DELETE /admin/api-keys/{key_id}` revokes a customer key.
-- `POST /admin/restaurants` creates a restaurant. Body: `{ "name": "North Room", "timezone": "America/New_York" }`.
-- `GET /restaurants` lists restaurants.
-- `POST /admin/restaurants/{restaurant_id}/tables` adds a table. Body: `{ "name": "T1", "capacity": 4 }`.
-- `GET /restaurants/{restaurant_id}/tables` lists active tables.
-- `POST /reservations` books the smallest available table that fits the party. Body:
-  `{ "restaurant_id": 1, "party_size": 2, "starts_at": "2026-10-12T19:00:00-04:00", "timezone": "America/New_York", "duration_minutes": 90 }`.
-  `duration_minutes` defaults to 90 and must be from 15 through 480.
-- `POST /availability` checks current availability using the same body as reservation creation. Availability can change before a subsequent booking.
-- `GET /reservations` lists the caller's reservations. Administrators can see all reservations and can optionally filter by `restaurant_id`.
-- `DELETE /reservations/{reservation_id}` cancels an owned reservation; administrators can cancel any reservation. Repeated cancellation returns 404.
-
-`starts_at` must be ISO 8601 and include a numeric UTC offset (a trailing `Z` is accepted). `timezone` must be an IANA timezone name, and the provided offset must be valid for that zone at the given local wall time. This makes DST fall-back times unambiguous and rejects nonexistent spring-forward times. Instants are stored as `TIMESTAMPTZ` in UTC. Reservation intervals are half-open: a party may book a table at the exact instant the previous reservation ends.
-
-## Concurrency and errors
-
-Reservation creation locks eligible table rows in stable ID order in the same transaction that selects and inserts the reservation. Concurrent requests therefore serialize around those tables. PostgreSQL also enforces a GiST exclusion constraint against overlapping confirmed intervals per table, so a conflicting insert cannot succeed even if another writer bypasses the API's lock protocol. A conflict or lack of a fitting/available table returns HTTP 409. Invalid payloads return 422, missing resources return 404, invalid/missing credentials return 401, and customer attempts to use administrator routes return 403.
-
-API keys do not expire automatically. Administrators can revoke customer keys through the API. Availability is determined at reservation-write time; this stage does not promise a hold between a separate availability lookup and booking.
-
-## PostgreSQL integration tests
-
-The test suite needs a disposable PostgreSQL database with `btree_gist` and a user that can create and drop schemas. The Compose setup installs the baseline SQL migration on first initialization and waits until PostgreSQL is ready:
+Create and activate a virtual environment, then install the backend dependencies:
 
 ```powershell
-python -m pip install -r requirements.txt -r requirements-test.txt
-docker compose -f compose.test.yml up -d --wait
-$env:TEST_DATABASE_URL = 'postgresql://postgres:postgres@127.0.0.1:5432/reservations_test'
-python -m unittest discover -s tests -v
-docker compose -f compose.test.yml down -v
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r stage-2\requirements.txt
 ```
 
-`TEST_DATABASE_URL` is exactly `postgresql://postgres:postgres@127.0.0.1:5432/reservations_test`. The service binds to loopback and uses the fixed local test credentials shown above; do not reuse them for a reachable or production database. The test suite creates an isolated schema for its run and drops it during teardown. `docker compose ... down -v` removes its anonymous data volume so the next `up` starts from a clean database and reruns the migration. If port 5432 is already occupied, change the host side of the port mapping and use that host port in `TEST_DATABASE_URL`. The suite sends 32 synchronized overlapping reservation requests, checks HTTP conflicts and the stored reservations, verifies PostgreSQL's exclusion constraint directly, and confirms that adjacent half-open reservations are accepted.
+On macOS or Linux, activate with `source .venv/bin/activate` and use the slash-separated requirements path.
+
+Start the disposable PostgreSQL database. On its first start, Compose applies the Stage 1 schema:
+
+```sh
+docker compose -f stage-1/compose.test.yml up -d --wait
+```
+
+Set the connection string and an administrator bootstrap token, then launch the app from the repository root:
+
+```powershell
+$env:DATABASE_URL = 'postgresql://postgres:postgres@127.0.0.1:5432/reservations_test'
+$env:BOOTSTRAP_ADMIN_TOKEN = 'replace-with-a-long-random-secret'
+python -m uvicorn app.main:app --app-dir stage-2 --reload
+```
+
+In macOS or Linux shells, set the same variables with `export DATABASE_URL=...` and `export BOOTSTRAP_ADMIN_TOKEN=...`. Open <http://127.0.0.1:8000> for the dashboard; `/health` is the API health endpoint. The UI and API use the same origin.
+
+For an existing PostgreSQL database, create an empty database and apply the schema once:
+
+```sh
+psql "$DATABASE_URL" -f stage-1/sql/001_initial.sql
+```
+
+Set `DATABASE_URL` and `BOOTSTRAP_ADMIN_TOKEN` in the service process environment. The bootstrap token has administrator access and is checked in constant time. Keep it out of source control. All API routes except `/health` require `Authorization: Bearer <key>`.
+
+Stop the disposable database when finished:
+
+```sh
+docker compose -f stage-1/compose.test.yml down
+```
+
+Use `down -v` only when you want to permanently discard its test database volume.
+
+## Dashboard
+
+The dark responsive dashboard uses `#9230e1` as its primary accent and calls the documented API routes over the same origin. It supports administrator sign-in, customer API-key creation and revocation, restaurant and table setup, table availability checks, reservation creation/listing, and cancellation. The backend remains the source of truth for authentication, ownership, timezone validation, and booking conflicts.
+
+## API overview
+
+| Method | Path | Access | Purpose |
+| --- | --- | --- | --- |
+| `GET` | `/health` | Public | Health status |
+| `POST` | `/admin/api-keys` | Admin | Create a customer API key; plaintext is returned once |
+| `DELETE` | `/admin/api-keys/{key_id}` | Admin | Revoke a customer API key |
+| `POST` | `/admin/restaurants` | Admin | Create a restaurant with an IANA timezone |
+| `GET` | `/restaurants` | Authenticated | List restaurants |
+| `POST` | `/admin/restaurants/{restaurant_id}/tables` | Admin | Add a table and capacity |
+| `GET` | `/restaurants/{restaurant_id}/tables` | Authenticated | List active tables |
+| `POST` | `/availability` | Authenticated | Check current table availability |
+| `POST` | `/reservations` | Authenticated | Book the smallest available table that fits |
+| `GET` | `/reservations` | Authenticated | Customers see their own reservations; admins can list all and filter by restaurant |
+| `DELETE` | `/reservations/{reservation_id}` | Owner or admin | Cancel a confirmed reservation |
+
+All API routes except `/health` require a bearer API key. Admin routes return `403` to customer keys. Missing or invalid credentials return `401`.
+
+Create a customer key with the bootstrap administrator credential:
+
+```sh
+curl -X POST http://127.0.0.1:8000/admin/api-keys \
+  -H "Authorization: Bearer $BOOTSTRAP_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"role":"customer"}'
+```
+
+The customer key is returned in the response and stored only as a SHA-256 hash by the API. Use the plaintext key as the bearer credential for customer operations.
+
+### Reservation rules
+
+Reservation requests include `restaurant_id`, `party_size`, `starts_at`, `timezone`, and optional `duration_minutes` (default 90; range 15–480). Example:
+
+```json
+{
+  "restaurant_id": 1,
+  "party_size": 2,
+  "starts_at": "2026-10-12T19:00:00-04:00",
+  "timezone": "America/New_York",
+  "duration_minutes": 90
+}
+```
+
+`starts_at` must be ISO 8601 with a UTC offset (`Z` is accepted). The offset must match the supplied IANA timezone at that wall time. This distinguishes daylight-saving fall-back times and rejects nonexistent spring-forward times. The supplied timezone must match the restaurant configuration. Stored instants use `TIMESTAMPTZ` in UTC.
+
+Reservation intervals are half-open, so a booking can begin exactly when the previous one ends. Reservation creation locks eligible table rows in stable ID order, and PostgreSQL enforces a GiST exclusion constraint on overlapping confirmed intervals per table. Conflicts and requests without a fitting/available table return `409`. Availability is a point-in-time check and does not hold a table for a later booking.
+
+Customer reservation listing and cancellation are scoped to the authenticated customer key. Administrators can list all reservations, optionally filter by `restaurant_id`, and cancel any confirmed reservation. Repeated cancellation returns `404`.
+
+## Integration tests
+
+Install test dependencies and start the disposable PostgreSQL service:
+
+```sh
+python -m pip install -r stage-2/requirements.txt -r stage-2/requirements-test.txt
+docker compose -f stage-1/compose.test.yml up -d --wait
+```
+
+Set `TEST_DATABASE_URL` to `postgresql://postgres:postgres@127.0.0.1:5432/reservations_test`, then run the suite:
+
+```powershell
+$env:TEST_DATABASE_URL = 'postgresql://postgres:postgres@127.0.0.1:5432/reservations_test'
+python -m unittest discover -s stage-2/tests -v
+```
+
+On macOS or Linux, use `export TEST_DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:5432/reservations_test'` before the same `python -m unittest` command.
+
+The suite creates and drops a unique schema for each run. It sends 32 synchronized overlapping reservation requests, verifies one success and 31 conflicts, checks stored rows and the database exclusion constraint, and confirms adjacent half-open reservations can both succeed. The test database user must be able to create/drop schemas and use `btree_gist`. If host port 5432 is occupied, change the host side in `stage-1/compose.test.yml` and set `TEST_DATABASE_URL` to that port.
+
+## Container deployment
+
+For a self-contained local deployment with persistent PostgreSQL storage, follow [Stage 4 deployment instructions](stage-4/DEPLOYMENT.md). The stack binds the web port to loopback by default. For public hosting, configure HTTPS and secret management at the deployment boundary.

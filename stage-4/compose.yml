@@ -1,0 +1,34 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tablekeeper}
+      POSTGRES_USER: ${POSTGRES_USER:-tablekeeper}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in stage-4/.env}
+    volumes:
+      - tablekeeper-data:/var/lib/postgresql/data
+      - ../stage-1/sql/001_initial.sql:/docker-entrypoint-initdb.d/001_initial.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+
+  api:
+    build:
+      context: ..
+      dockerfile: stage-4/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tablekeeper}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-tablekeeper}
+      BOOTSTRAP_ADMIN_TOKEN: ${BOOTSTRAP_ADMIN_TOKEN:?Set BOOTSTRAP_ADMIN_TOKEN in stage-4/.env}
+    ports:
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
+
+volumes:
+  tablekeeper-data:

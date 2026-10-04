@@ -6,11 +6,14 @@ import hashlib
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import psycopg
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from psycopg.errors import ExclusionViolation
 from psycopg.rows import dict_row
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -19,7 +22,8 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localho
 BOOTSTRAP_ADMIN_TOKEN = os.getenv("BOOTSTRAP_ADMIN_TOKEN", "")
 DEFAULT_DURATION_MINUTES = 90
 
-app = FastAPI(title="Restaurant Reservation Service", version="1.0.0")
+app = FastAPI(title="Tablekeeper Service", version="1.0.0")
+STATIC_DIR = Path(__file__).resolve().parents[2] / "stage-3" / "static"
 
 
 def connect() -> psycopg.Connection:
@@ -311,3 +315,12 @@ def cancel_reservation(
             ).fetchone()
         if row is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Reservation not found")
+
+
+@app.get("/", include_in_schema=False)
+def dashboard() -> FileResponse:
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+# Keep the asset mount after API routes so it cannot shadow their paths.
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

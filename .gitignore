@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.jam-workspace.json
+.env
+.env.*
+!.env.example

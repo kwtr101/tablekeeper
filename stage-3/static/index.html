@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#111019">
+    <title>Tablekeeper · Reservations</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="Tablekeeper home">
+          <span class="brand-mark" aria-hidden="true">t</span>
+          <span>tablekeeper</span>
+        </a>
+        <nav class="top-nav" aria-label="Main navigation">
+          <a class="nav-link active" href="#overview">Overview</a>
+          <a class="nav-link" href="#booking">Booking</a>
+          <a class="nav-link" href="#reservations">Reservations</a>
+        </nav>
+        <div class="top-actions">
+          <span class="connection-dot" id="connectionDot" aria-hidden="true"></span>
+          <span class="connection-label" id="connectionLabel">Not connected</span>
+          <button class="icon-button" id="refreshButton" type="button" aria-label="Refresh dashboard" title="Refresh">↻</button>
+        </div>
+      </header>
+
+      <main>
+        <section class="hero" id="overview">
+          <div class="hero-copy">
+            <p class="eyebrow"><span class="eyebrow-line"></span> RESTAURANT OPERATIONS</p>
+            <h1>A better view<br>of every table.</h1>
+            <p class="hero-subtitle">Manage availability and reservations from one calm, clear workspace.</p>
+          </div>
+          <div class="hero-orbit" aria-hidden="true">
+            <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div>
+            <div class="orbit-core"><span>TK</span></div>
+            <span class="orbit-dot dot-one"></span><span class="orbit-dot dot-two"></span>
+          </div>
+          <div class="hero-glow" aria-hidden="true"></div>
+        </section>
+
+        <div class="dashboard-grid">
+          <aside class="side-column">
+            <section class="panel connection-panel">
+              <div class="panel-heading">
+                <div><p class="eyebrow">ACCESS</p><h2>Connect your workspace</h2></div>
+                <span class="lock-icon" aria-hidden="true">⌑</span>
+              </div>
+              <p class="muted">Use your administrator token or customer API key. It stays in this browser session.</p>
+              <form id="connectForm" class="stack-form">
+                <label for="apiKey">Bearer API key</label>
+                <div class="input-with-action">
+                  <input id="apiKey" type="password" autocomplete="off" placeholder="Paste your API key" required>
+                  <button class="icon-button reveal-button" type="button" id="revealKey" aria-label="Show API key">◉</button>
+                </div>
+                <button class="button button-primary button-full" type="submit">Save &amp; connect <span aria-hidden="true">→</span></button>
+              </form>
+              <div class="divider"></div>
+              <details class="admin-tools">
+                <summary>Administrator tools</summary>
+                <div class="mini-form">
+                  <button class="button button-secondary button-full" type="button" id="createKeyButton">Create customer key</button>
+                  <label for="revokeKeyId">Revoke customer key ID</label>
+                  <div class="inline-fields">
+                    <input id="revokeKeyId" type="number" min="1" placeholder="Key ID">
+                    <button class="button button-quiet" type="button" id="revokeKeyButton">Revoke</button>
+                  </div>
+                  <div id="newKeyNotice" class="key-notice" hidden></div>
+                </div>
+              </details>
+            </section>
+
+            <section class="panel stats-panel">
+              <div class="panel-heading"><div><p class="eyebrow">AT A GLANCE</p><h2>Today’s setup</h2></div><span class="sparkle" aria-hidden="true">✦</span></div>
+              <div class="stat-row"><span class="stat-icon purple-icon">⌂</span><span class="stat-name">Restaurants</span><strong id="restaurantCount">—</strong></div>
+              <div class="stat-row"><span class="stat-icon pink-icon">▦</span><span class="stat-name">Active tables</span><strong id="tableCount">—</strong></div>
+              <div class="stat-row"><span class="stat-icon blue-icon">◷</span><span class="stat-name">Reservations</span><strong id="reservationCount">—</strong></div>
+              <p class="stat-footnote" id="statsFootnote">Connect to load your workspace.</p>
+            </section>
+          </aside>
+
+          <div class="main-column">
+            <section class="panel booking-panel" id="booking">
+              <div class="section-heading">
+                <div><p class="eyebrow">NEW BOOKING</p><h2>Find a table</h2></div>
+                <span class="section-index">01 <span>/</span> 02</span>
+              </div>
+              <form id="bookingForm" class="booking-form">
+                <div class="form-grid">
+                  <div class="field field-wide">
+                    <label for="restaurantSelect">Restaurant</label>
+                    <select id="restaurantSelect" required><option value="">Connect to load restaurants</option></select>
+                  </div>
+                  <div class="field">
+                    <label for="partySize">Party size</label>
+                    <input id="partySize" type="number" min="1" max="100" value="2" required>
+                  </div>
+                  <div class="field">
+                    <label for="duration">Duration</label>
+                    <select id="duration"><option value="90">90 min · Standard</option><option value="60">60 min</option><option value="120">120 min</option><option value="180">180 min</option></select>
+                  </div>
+                  <div class="field field-wide">
+                    <label for="startsAt">Date &amp; time <span class="label-note">Restaurant local time</span></label>
+                    <input id="startsAt" type="datetime-local" required>
+                  </div>
+                </div>
+                <div class="timezone-note"><span class="timezone-icon" aria-hidden="true">◎</span><span>Timezone: <strong id="timezoneLabel">—</strong> <span class="muted">· offset is included automatically</span></span></div>
+                <div class="booking-actions">
+                  <div id="availabilityResult" class="availability-result" aria-live="polite">Choose a restaurant and time to check availability.</div>
+                  <div class="button-row">
+                    <button class="button button-secondary" type="button" id="availabilityButton">Check availability</button>
+                    <button class="button button-primary" type="submit">Reserve table <span aria-hidden="true">→</span></button>
+                  </div>
+                </div>
+              </form>
+            </section>
+
+            <section class="panel restaurants-panel">
+              <div class="section-heading compact-heading">
+                <div><p class="eyebrow">YOUR VENUES</p><h2>Restaurants &amp; tables</h2></div>
+                <span class="section-index">CONFIGURATION</span>
+              </div>
+              <div class="restaurant-list" id="restaurantList"><div class="empty-state">Connect to view restaurant configuration.</div></div>
+              <details class="add-table-details">
+                <summary>Manage restaurants and tables <span aria-hidden="true">＋</span></summary>
+                <div class="manage-grid">
+                  <form id="restaurantForm" class="mini-form">
+                    <h3>Add restaurant</h3>
+                    <label for="restaurantName">Restaurant name</label>
+                    <input id="restaurantName" maxlength="200" placeholder="e.g. North Room" required>
+                    <label for="restaurantTimezone">IANA timezone</label>
+                    <input id="restaurantTimezone" placeholder="Europe/Paris" required>
+                    <button class="button button-secondary" type="submit">Add restaurant</button>
+                  </form>
+                  <form id="tableForm" class="mini-form">
+                    <h3>Add table</h3>
+                    <label for="tableRestaurant">Restaurant</label>
+                    <select id="tableRestaurant" required><option value="">Select restaurant</option></select>
+                    <label for="tableName">Table name</label>
+                    <input id="tableName" maxlength="100" placeholder="e.g. T1" required>
+                    <label for="tableCapacity">Capacity</label>
+                    <input id="tableCapacity" type="number" min="1" max="100" value="4" required>
+                    <button class="button button-secondary" type="submit">Add table</button>
+                  </form>
+                </div>
+              </details>
+            </section>
+
+            <section class="panel reservations-panel" id="reservations">
+              <div class="section-heading compact-heading">
+                <div><p class="eyebrow">BOOKING LEDGER</p><h2>Reservations</h2></div>
+                <button class="button button-quiet" type="button" id="loadReservationsButton">Refresh list <span aria-hidden="true">↻</span></button>
+              </div>
+              <div id="reservationsList" class="reservations-list"><div class="empty-state">Connect to load reservations.</div></div>
+            </section>
+          </div>
+        </div>
+        <div id="toast" class="toast" role="status" aria-live="polite"></div>
+      </main>
+
+      <footer class="footer"><span>TABLEKEEPER</span><span>Thoughtful reservations, smoothly handled.</span><a href="/health" target="_blank" rel="noreferrer">API health <span aria-hidden="true">↗</span></a></footer>
+    </div>
+  </body>
+</html>
