@@ -155,6 +155,7 @@ details > summary::-webkit-details-marker { display: none; }
 .empty-state { padding: 20px 14px; border: 1px dashed #3a3546; border-radius: 12px; color: var(--faint); text-align: center; font-size: 11px; line-height: 1.5; }
 .toast { position: fixed; z-index: 10; right: 24px; bottom: 22px; max-width: min(400px, calc(100vw - 32px)); padding: 13px 17px; border: 1px solid #514063; border-radius: 12px; color: #f4eafd; background: #292133; box-shadow: 0 12px 38px rgba(0,0,0,.35); font-size: 12px; opacity: 0; pointer-events: none; transform: translateY(8px); transition: opacity .2s ease, transform .2s ease; }.toast.show { opacity: 1; transform: translateY(0); }.toast.error { border-color: rgba(242,125,154,.4); color: #ffdce3; background: #35212a; }
 .footer { display: flex; justify-content: space-between; align-items: center; gap: 15px; padding: 26px 2px 30px; color: var(--faint); font-size: 10px; }.footer > span:first-child { color: #827b8e; font: 10px 'DM Mono', monospace; letter-spacing: 1px; }.footer a { color: #b78bd9; }.footer a:hover { color: #d6b1f5; }
+.fold-choice[hidden] { display: none; }
 
 @media (max-width: 900px) {
   .app-shell { padding: 0 24px; }

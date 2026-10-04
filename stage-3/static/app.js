@@ -6,6 +6,8 @@
   const restaurantList = $('#restaurantList');
   const reservationsList = $('#reservationsList');
   const availabilityResult = $('#availabilityResult');
+  const foldChoiceWrap = $('#foldChoiceWrap');
+  const foldChoice = $('#foldChoice');
   const toast = $('#toast');
   const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   const timeZoneFormatterCache = new Map();
@@ -213,7 +215,7 @@
     return `${sign}${String(Math.floor(absolute / 60)).padStart(2, '0')}:${String(absolute % 60).padStart(2, '0')}`;
   }
 
-  function offsetAwareStart(localValue, timezone) {
+  function startCandidates(localValue, timezone) {
     const match = localValue.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
     if (!match) throw new Error('Choose a valid date and time.');
     const [, yearText, monthText, dayText, hourText, minuteText] = match;
@@ -233,7 +235,43 @@
     }
     if (!candidates.length) throw new Error('That local time does not exist in this restaurant’s timezone because of a daylight-saving change.');
     candidates.sort((left, right) => left.instant - right.instant);
-    const selected = candidates[0];
+    return candidates;
+  }
+
+  function formatOccurrence(candidate) {
+    const time = new Intl.DateTimeFormat([], {
+      timeZone: restaurants.find((item) => String(item.id) === restaurantSelect.value)?.timezone,
+      hour: 'numeric', minute: '2-digit', timeZoneName: 'short'
+    }).format(candidate.instant);
+    return `${time} (UTC${offsetText(candidate.offset)})`;
+  }
+
+  function syncFoldChoice() {
+    const restaurant = restaurants.find((item) => String(item.id) === restaurantSelect.value);
+    if (!restaurant || !$('#startsAt').value) {
+      foldChoiceWrap.hidden = true;
+      return;
+    }
+    try {
+      const candidates = startCandidates($('#startsAt').value, restaurant.timezone);
+      if (candidates.length < 2) {
+        foldChoiceWrap.hidden = true;
+        return;
+      }
+      foldChoice.replaceChildren(...candidates.map((candidate, index) => option(
+        index,
+        `${index === 0 ? 'First' : 'Second'} occurrence — ${formatOccurrence(candidate)}`
+      )));
+      foldChoice.value = '0';
+      foldChoiceWrap.hidden = false;
+    } catch {
+      foldChoiceWrap.hidden = true;
+    }
+  }
+
+  function offsetAwareStart(localValue, timezone) {
+    const candidates = startCandidates(localValue, timezone);
+    const selected = candidates[foldChoiceWrap.hidden ? 0 : Number(foldChoice.value)] ?? candidates[0];
     return `${localValue}:00${offsetText(selected.offset)}`;
   }
 
@@ -279,7 +317,11 @@
     apiKeyInput.type = reveal ? 'text' : 'password';
     $('#revealKey').setAttribute('aria-label', reveal ? 'Hide API key' : 'Show API key');
   });
-  restaurantSelect.addEventListener('change', syncRestaurantTimezone);
+  restaurantSelect.addEventListener('change', () => {
+    syncRestaurantTimezone();
+    syncFoldChoice();
+  });
+  $('#startsAt').addEventListener('input', syncFoldChoice);
 
   $('#availabilityButton').addEventListener('click', () => withBusy($('#availabilityButton'), async () => {
     const result = await api('/availability', { method: 'POST', body: JSON.stringify(bookingPayload()) });

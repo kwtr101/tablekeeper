@@ -106,6 +106,10 @@
                     <label for="startsAt">Date &amp; time <span class="label-note">Restaurant local time</span></label>
                     <input id="startsAt" type="datetime-local" required>
                   </div>
+                  <div id="foldChoiceWrap" class="field field-wide fold-choice" hidden>
+                    <label for="foldChoice">This local time occurs twice. Choose which occurrence to book.</label>
+                    <select id="foldChoice"></select>
+                  </div>
                 </div>
                 <div class="timezone-note"><span class="timezone-icon" aria-hidden="true">◎</span><span>Timezone: <strong id="timezoneLabel">—</strong> <span class="muted">· offset is included automatically</span></span></div>
                 <div class="booking-actions">
